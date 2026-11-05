@@ -1,0 +1,26 @@
+[package]
+name = "appsec-scanner"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.3", features = [] }
+
+[dependencies]
+appsec-core = { path = "../crates/core" }
+tauri = { version = "2.12.4", features = [] }
+anyhow = "1"
+serde = "1"
+chrono = "0.4"
+tauri-plugin-dialog = "2"
+uuid = "1"
+pulldown-cmark = { version = "0.13.6", default-features = false, features = ["html"] }
+
+# Generate PDF laporan lewat WebKitGTK print-to-file (versi sama dengan yang dipakai wry).
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+gtk = "0.18"

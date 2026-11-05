@@ -1,0 +1,11 @@
+{
+  "name": "appsec",
+  "private": true,
+  "scripts": {
+    "dev": "cargo tauri dev",
+    "build": "cargo tauri build",
+    "build:linux": "cargo tauri build --bundle deb,rpm,appimage",
+    "build:mac": "cargo tauri build --bundle app,dmg",
+    "build:windows": "cargo tauri build --bundle nsis,msi"
+  }
+}

@@ -1,0 +1,28 @@
+# Contoh job untuk .gitlab-ci.yml project aplikasi.
+# Image dibangun dari ci/Dockerfile repo ini dan di-push ke registry internal.
+variables:
+  APPSEC_IMAGE: registry.contoh.co.id/security/appsec-scanner:latest
+  TRIVY_CACHE_DIR: .trivycache/
+
+# SAST: tiap merge request & push. Gagal kalau ada temuan Critical.
+appsec-sast:
+  stage: test
+  image: $APPSEC_IMAGE
+  cache:
+    paths: [.trivycache/]
+  script:
+    - appsec scan . --format md --fail-on critical > appsec-sast.md
+  artifacts:
+    when: always
+    paths: [appsec-sast.md]
+
+# DAST: setelah deploy ke staging. Hanya untuk aplikasi milik tim sendiri.
+appsec-dast:
+  stage: post-deploy
+  image: $APPSEC_IMAGE
+  needs: [deploy-staging]
+  script:
+    - appsec scan "$STAGING_URL" --authorized --format md --fail-on high > appsec-dast.md
+  artifacts:
+    when: always
+    paths: [appsec-dast.md]

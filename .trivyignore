@@ -1,0 +1,5 @@
+# glib 0.18 dikunci Tauri/webkit2gtk; VariantStrIter tidak dipakai. Hapus saat Tauri pindah ke glib >= 0.20.
+GHSA-wrw7-89jp-8q8g
+
+# Image CI menjalankan CLI sekali jalan (bukan layanan), HEALTHCHECK tidak relevan.
+DS-0026
