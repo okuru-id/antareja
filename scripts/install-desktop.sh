@@ -18,6 +18,12 @@ APP_DIR="$HOME/.local/share/applications"
 ICON_PNG="$ICON_DIR/$APP_ID.png"
 mkdir -p "$ICON_DIR" "$APP_DIR"
 
+# Jangan bikin duplikat: bila paket .deb sudah memasang entri sistem, lewati.
+if grep -rqs "StartupWMClass=$APP_ID" /usr/share/applications/ 2>/dev/null; then
+  echo "Entri sistem untuk '$APP_ID' sudah terpasang (mis. dari paket .deb); tidak perlu skrip ini."
+  exit 0
+fi
+
 # Bersihkan percobaan lama bila ada.
 rm -f "$APP_DIR/id.appsec.scanner.desktop" "$ICON_DIR/id.appsec.scanner.png"
 

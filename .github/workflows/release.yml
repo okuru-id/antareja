@@ -44,7 +44,7 @@ jobs:
         run: npm i -g @tauri-apps/cli@^2
 
       - name: Build (deb, AppImage, rpm)
-        run: tauri build --bundle deb,appimage,rpm
+        run: tauri build --bundles deb appimage rpm
 
       - name: Buat Release + unggah bundle
         uses: softprops/action-gh-release@v2

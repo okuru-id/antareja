@@ -4,8 +4,8 @@
   "scripts": {
     "dev": "cargo tauri dev",
     "build": "cargo tauri build",
-    "build:linux": "cargo tauri build --bundle deb,rpm,appimage",
-    "build:mac": "cargo tauri build --bundle app,dmg",
-    "build:windows": "cargo tauri build --bundle nsis,msi"
+    "build:linux": "cargo tauri build --bundles deb rpm appimage",
+    "build:mac": "cargo tauri build --bundles app dmg",
+    "build:windows": "cargo tauri build --bundles nsis msi"
   }
 }
