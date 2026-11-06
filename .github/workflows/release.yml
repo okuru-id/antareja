@@ -1,6 +1,6 @@
-name: Release Linux
+name: Release
 
-# Build desktop app Linux (.deb, .AppImage, .rpm) saat tag versi di-push, mis. `git tag v0.1.0 && git push origin v0.1.0`.
+# Build desktop app (Linux, macOS, Windows) saat tag versi di-push, mis. `git tag v0.2.0 && git push origin v0.2.0`.
 on:
   push:
     tags:
@@ -10,12 +10,21 @@ permissions:
   contents: write   # untuk membuat GitHub Release + unggah bundle
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-22.04
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,   bundles: 'deb appimage rpm' }  # Linux x86_64
+          - { os: macos-13,       bundles: 'dmg' }               # macOS Intel (x86_64)
+          - { os: macos-14,       bundles: 'dmg' }               # macOS Apple Silicon (arm64)
+          - { os: windows-latest, bundles: 'nsis msi' }          # Windows x86_64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dependensi sistem (Tauri v2)
+      - name: Dependensi sistem (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -27,6 +36,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: '.'
+          key: ${{ matrix.os }}
 
       - uses: actions/setup-node@v4
         with:
@@ -38,13 +48,14 @@ jobs:
         run: npm --prefix ui ci
 
       - name: Unduh sidecar (gitleaks, trivy, nuclei)
+        shell: bash
         run: bash scripts/fetch-sidecars.sh
 
       - name: Install Tauri CLI
         run: npm i -g @tauri-apps/cli@^2
 
-      - name: Build (deb, AppImage, rpm)
-        run: tauri build --bundles deb appimage rpm
+      - name: Build (${{ matrix.bundles }})
+        run: tauri build --bundles ${{ matrix.bundles }}
 
       - name: Buat Release + unggah bundle
         uses: softprops/action-gh-release@v2
@@ -53,3 +64,6 @@ jobs:
             target/release/bundle/deb/*.deb
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/rpm/*.rpm
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/msi/*.msi
