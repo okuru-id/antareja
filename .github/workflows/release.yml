@@ -1,0 +1,55 @@
+name: Release Linux
+
+# Build desktop app Linux (.deb, .AppImage, .rpm) saat tag versi di-push, mis. `git tag v0.1.0 && git push origin v0.1.0`.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # untuk membuat GitHub Release + unggah bundle
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependensi sistem (Tauri v2)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf build-essential file
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '.'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependensi frontend
+        run: npm --prefix ui ci
+
+      - name: Unduh sidecar (gitleaks, trivy, nuclei)
+        run: bash scripts/fetch-sidecars.sh
+
+      - name: Install Tauri CLI
+        run: npm i -g @tauri-apps/cli@^2
+
+      - name: Build (deb, AppImage, rpm)
+        run: tauri build --bundle deb,appimage,rpm
+
+      - name: Buat Release + unggah bundle
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/rpm/*.rpm
