@@ -1,6 +1,8 @@
-# AppSec Scanner
+# Antareja
 
-Aplikasi desktop (Tauri 2 + Rust + Vue/shadcn-vue) untuk scan keamanan aset milik tim sendiri. Lihat PRD.
+*Menelusuri jejak, menemukan celah.*
+
+Aplikasi desktop (Tauri 2 + Rust + Vue/shadcn-vue) untuk scan keamanan aset milik tim sendiri. Nama & branding: lihat [DESIGN.md](DESIGN.md). Lihat juga PRD.
 
 ## Setup (Ubuntu)
 
