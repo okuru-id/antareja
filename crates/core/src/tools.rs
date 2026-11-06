@@ -367,22 +367,26 @@ fn replace_dir(new: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// ZAP (paket Linux resmi, SHA-256 dari GitHub) + JRE Temurin 17 bila Java sistem < 17 (SHA-256 dari API Adoptium).
+/// ZAP (Linux tar / macOS crossplatform zip, SHA-256 dari GitHub) + JRE Temurin 17 bila Java sistem < 17 (SHA-256 dari API Adoptium).
 fn install_zap(log: &dyn Fn(&str)) -> Result<String> {
     let dir = TOOLS_DIR.get().context("folder tools belum diset")?;
-    anyhow::ensure!(std::env::consts::OS == "linux", "Pemasangan ZAP otomatis hanya untuk Linux; di OS lain pasang ZAP dari zaproxy.org");
+    let mac = std::env::consts::OS == "macos";
+    anyhow::ensure!(mac || std::env::consts::OS == "linux", "Pemasangan ZAP otomatis hanya untuk Linux/macOS; di OS lain pasang ZAP dari zaproxy.org");
     let http = http(30)?;
     let mut msg = vec![];
     if java_major().is_none_or(|v| v < 17) {
         let arch = if std::env::consts::ARCH == "aarch64" { "aarch64" } else { "x64" };
-        let api = json(&http, &format!("https://api.adoptium.net/v3/assets/latest/17/hotspot?architecture={arch}&image_type=jre&os=linux&vendor=eclipse"))?;
+        let jos = if mac { "mac" } else { "linux" };
+        let api = json(&http, &format!("https://api.adoptium.net/v3/assets/latest/17/hotspot?architecture={arch}&image_type=jre&os={jos}&vendor=eclipse"))?;
         let pkg = &api[0]["binary"]["package"];
         let (url, sum) = (pkg["link"].as_str().context("link JRE tidak ada")?, pkg["checksum"].as_str().context("checksum JRE tidak ada")?);
         log("Java 17+ tidak ditemukan: pasang JRE Temurin 17…");
         let (tmp, archive) = download_verified(dir, "jre", url, sum, 600, log)?;
         anyhow::ensure!(Command::new("tar").arg("-xzf").arg(&archive).arg("-C").arg(&tmp).status()?.success(), "ekstrak JRE gagal");
         let root = std::fs::read_dir(&tmp)?.flatten().map(|e| e.path()).find(|p| p.is_dir()).context("isi arsip JRE kosong")?;
-        replace_dir(&root, &dir.join("jre"))?;
+        // macOS: struktur JRE adalah <root>/Contents/Home/bin/java.
+        let home = if mac { root.join("Contents").join("Home") } else { root };
+        replace_dir(&home, &dir.join("jre"))?;
         let _ = std::fs::remove_dir_all(&tmp);
         msg.push("JRE 17 terpasang".to_string());
     }
@@ -393,11 +397,16 @@ fn install_zap(log: &dyn Fn(&str)) -> Result<String> {
         return Ok(msg.join(" · "));
     }
     let rel = json(&http, &format!("https://api.github.com/repos/zaproxy/zaproxy/releases/tags/{tag}"))?;
-    let name = format!("ZAP_{v}_Linux.tar.gz");
-    let asset = rel["assets"].as_array().into_iter().flatten().find(|a| a["name"] == name.as_str()).context("aset ZAP Linux tidak ditemukan")?;
+    let name = if mac { format!("ZAP_{v}_Crossplatform.zip") } else { format!("ZAP_{v}_Linux.tar.gz") };
+    let asset = rel["assets"].as_array().into_iter().flatten().find(|a| a["name"] == name.as_str()).with_context(|| format!("aset {name} tidak ditemukan"))?;
     let sum = asset["digest"].as_str().and_then(|d| d.strip_prefix("sha256:")).context("checksum ZAP tidak tersedia")?;
     let (tmp, archive) = download_verified(dir, "zap", asset["browser_download_url"].as_str().unwrap_or_default(), sum, 1800, log)?;
-    anyhow::ensure!(Command::new("tar").arg("-xzf").arg(&archive).arg("-C").arg(&tmp).status()?.success(), "ekstrak ZAP gagal");
+    let ok = if mac {
+        Command::new("unzip").args(["-o", "-q"]).arg(&archive).arg("-d").arg(&tmp).status()
+    } else {
+        Command::new("tar").arg("-xzf").arg(&archive).arg("-C").arg(&tmp).status()
+    }?;
+    anyhow::ensure!(ok.success(), "ekstrak ZAP gagal");
     let root = std::fs::read_dir(&tmp)?.flatten().map(|e| e.path()).find(|p| p.is_dir()).context("isi arsip ZAP kosong")?;
     std::fs::write(root.join(".appsec-version"), v)?;
     replace_dir(&root, &dir.join("zap"))?;
@@ -451,14 +460,21 @@ fn install_testssl(log: &dyn Fn(&str)) -> Result<String> {
 fn update_binary(name: &str, log: &dyn Fn(&str)) -> Result<String> {
     let dir = TOOLS_DIR.get().context("folder tools belum diset")?;
     let arm = std::env::consts::ARCH == "aarch64";
-    anyhow::ensure!(std::env::consts::OS == "linux" && (arm || std::env::consts::ARCH == "x86_64"), "Update otomatis hanya untuk Linux x86_64/arm64");
-    let asset = match name {
-        "gitleaks" => if arm { "gitleaks_{v}_linux_arm64.tar.gz" } else { "gitleaks_{v}_linux_x64.tar.gz" },
-        "trivy" => if arm { "trivy_{v}_Linux-ARM64.tar.gz" } else { "trivy_{v}_Linux-64bit.tar.gz" },
-        "katana" => if arm { "katana_{v}_linux_arm64.zip" } else { "katana_{v}_linux_amd64.zip" },
-        "ffuf" => if arm { "ffuf_{v}_linux_arm64.tar.gz" } else { "ffuf_{v}_linux_amd64.tar.gz" },
-        "dalfox" => if arm { "dalfox-{tag}-linux-aarch64.tar.gz" } else { "dalfox-{tag}-linux-x86_64.tar.gz" },
-        _ => if arm { "nuclei_{v}_linux_arm64.zip" } else { "nuclei_{v}_linux_amd64.zip" },
+    let mac = std::env::consts::OS == "macos";
+    anyhow::ensure!((mac || std::env::consts::OS == "linux") && (arm || std::env::consts::ARCH == "x86_64"), "Update otomatis hanya untuk Linux/macOS (x86_64/arm64)");
+    let asset = match (name, mac) {
+        ("gitleaks", false) => if arm { "gitleaks_{v}_linux_arm64.tar.gz" } else { "gitleaks_{v}_linux_x64.tar.gz" },
+        ("gitleaks", true) => if arm { "gitleaks_{v}_darwin_arm64.tar.gz" } else { "gitleaks_{v}_darwin_x64.tar.gz" },
+        ("trivy", false) => if arm { "trivy_{v}_Linux-ARM64.tar.gz" } else { "trivy_{v}_Linux-64bit.tar.gz" },
+        ("trivy", true) => if arm { "trivy_{v}_macOS-ARM64.tar.gz" } else { "trivy_{v}_macOS-64bit.tar.gz" },
+        ("katana", false) => if arm { "katana_{v}_linux_arm64.zip" } else { "katana_{v}_linux_amd64.zip" },
+        ("katana", true) => if arm { "katana_{v}_macOS_arm64.zip" } else { "katana_{v}_macOS_amd64.zip" },
+        ("ffuf", false) => if arm { "ffuf_{v}_linux_arm64.tar.gz" } else { "ffuf_{v}_linux_amd64.tar.gz" },
+        ("ffuf", true) => if arm { "ffuf_{v}_macOS_arm64.tar.gz" } else { "ffuf_{v}_macOS_amd64.tar.gz" },
+        ("dalfox", false) => if arm { "dalfox-{tag}-linux-aarch64.tar.gz" } else { "dalfox-{tag}-linux-x86_64.tar.gz" },
+        ("dalfox", true) => if arm { "dalfox-{tag}-macos-aarch64.tar.gz" } else { "dalfox-{tag}-macos-x86_64.tar.gz" },
+        (_, false) => if arm { "nuclei_{v}_linux_arm64.zip" } else { "nuclei_{v}_linux_amd64.zip" },
+        (_, true) => if arm { "nuclei_{v}_macOS_arm64.zip" } else { "nuclei_{v}_macOS_amd64.zip" },
     };
     let http = http(30)?;
     log("cek rilis terbaru di GitHub…");

@@ -344,6 +344,12 @@ pub fn sbom(root: &Path, out: &Path, log: &dyn Fn(&str)) -> Result<()> {
     run("trivy", root, &["fs", "--format", "cyclonedx", "--output", out, "--no-progress", "."], log).map(|_| ())
 }
 
+/// SBOM CycloneDX (JSON) + kerentanan tertanam, untuk viewer dashboard SBOM dalam app.
+pub fn sbom_json(root: &Path, log: &dyn Fn(&str)) -> Result<String> {
+    let out = run("trivy", root, &["fs", "--format", "cyclonedx", "--scanners", "vuln", "--no-progress", "."], log)?;
+    Ok(String::from_utf8(out)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

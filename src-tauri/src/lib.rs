@@ -52,6 +52,18 @@ async fn export_sbom(app: AppHandle, target_id: Uuid, path: PathBuf) -> Res<Path
     .map_err(|e| e.to_string())?
 }
 
+/// SBOM CycloneDX (JSON) dikembalikan sebagai string untuk viewer SBOM dalam app.
+#[tauri::command]
+async fn sbom_json(app: AppHandle, target_id: Uuid) -> Res<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = app.state::<Db>().get(target_id).map_err(err)?.ok_or("Target tidak terdaftar")?;
+        let TargetKind::SourcePath(root) = target.kind else { return Err("SBOM hanya untuk target folder (SAST)".into()) };
+        appsec_core::sast::sbom_json(std::path::Path::new(&root), &|_| {}).map_err(err)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Token pembatalan scan yang sedang berjalan, per target.
 #[derive(Default)]
 struct Running(std::sync::Mutex<std::collections::HashMap<Uuid, appsec_core::cancel::Token>>);
@@ -339,7 +351,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![list_targets, add_target, remove_target, run_scan, latest_scans,
             report_markdown, save_report, read_markdown, set_finding_status,
             get_dast_options, set_dast_options, link_target, markdown_html, scan_history, print_pdf,
-            get_tool_options, set_tool_options, tool_info, update_tool, tool_latest, cancel_scan, export_sbom,
+            get_tool_options, set_tool_options, tool_info, update_tool, tool_latest, cancel_scan, export_sbom, sbom_json,
             github_status, github_sign_in, github_sign_out])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

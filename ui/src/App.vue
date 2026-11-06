@@ -7,10 +7,11 @@ import ScanView from './ScanView.vue'
 import TargetsView from './TargetsView.vue'
 import FindingsView from './FindingsView.vue'
 import ReportView from './ReportView.vue'
+import SbomView from './SbomView.vue'
 import SettingsView from './SettingsView.vue'
 import LogPanel from './LogPanel.vue'
 import StatusBar from './StatusBar.vue'
-import { LayoutDashboard, Crosshair, Bug, FileText, Settings, Play } from '@lucide/vue'
+import { LayoutDashboard, Crosshair, Bug, FileText, Boxes, Settings, Play } from '@lucide/vue'
 import { tab, dropped, logOpen, sidebarMini, scans, openFindings, refresh } from './store'
 
 const PAGES = {
@@ -19,6 +20,7 @@ const PAGES = {
   scan: { label: 'Scan', icon: Play, view: ScanView, sub: 'Jalankan pemindaian keamanan pada target aplikasi.' },
   findings: { label: 'Temuan', icon: Bug, view: FindingsView, sub: 'Hasil scan terakhir dari setiap target.' },
   report: { label: 'Laporan', icon: FileText, view: ReportView, sub: 'Pratinjau, simpan, dan buka laporan Markdown.' },
+  sbom: { label: 'SBOM', icon: Boxes, view: SbomView, sub: 'Daftar komponen & lisensi project (CycloneDX).' },
   settings: { label: 'Pengaturan', icon: Settings, view: SettingsView, sub: 'Versi, update, dan konfigurasi tool scan.' },
 } as const
 type Page = keyof typeof PAGES
